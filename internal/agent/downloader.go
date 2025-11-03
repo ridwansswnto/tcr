@@ -11,6 +11,19 @@ import (
 )
 
 // EnsureRunnerBinary memastikan binary GitHub Actions runner tersedia di /core, bukan di setiap runner instance.
+package agent
+
+import (
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+)
+
+// EnsureRunnerBinary memastikan binary core runner tersedia di <baseDir>/core.
 func EnsureRunnerBinary(baseDir, version string) error {
 	if baseDir == "" {
 		return fmt.Errorf("empty base dir")
@@ -20,18 +33,22 @@ func EnsureRunnerBinary(baseDir, version string) error {
 	tarPath := filepath.Join(baseDir, fmt.Sprintf("runner-%s.tar.gz", version))
 	configPath := filepath.Join(coreDir, "config.sh")
 
-	// Kalau sudah ada, skip
+	// ✅ 1. Cek apakah binary core sudah tersedia
 	if _, err := os.Stat(configPath); err == nil {
 		log.Printf("✅ Shared runner binary already exists at %s", coreDir)
 		return nil
 	}
 
-	// Buat folder core
+	// ✅ 2. Pastikan folder core bersih dan ada
 	if err := os.MkdirAll(coreDir, 0755); err != nil {
 		return fmt.Errorf("failed to create core dir: %v", err)
 	}
 
-	// Download binary tarball
+	// Hapus sisa-sisa file lama kalau ada (biar gak nested recursive)
+	os.RemoveAll(filepath.Join(coreDir, "core"))
+	os.RemoveAll(filepath.Join(coreDir, "instances"))
+
+	// ✅ 3. Download binary tarball dari GitHub
 	url := fmt.Sprintf("https://github.com/actions/runner/releases/download/v%s/actions-runner-linux-x64-%s.tar.gz", version, version)
 	log.Printf("⬇️ Downloading GitHub runner v%s ...", version)
 
@@ -51,17 +68,18 @@ func EnsureRunnerBinary(baseDir, version string) error {
 		return fmt.Errorf("failed to save runner binary: %v", err)
 	}
 
-	// Ekstrak TAR ke coreDir
+	// ✅ 4. Ekstrak tarball ke folder core
 	log.Printf("📦 Extracting %s → %s", tarPath, coreDir)
 	cmd := exec.Command("tar", "xzf", tarPath, "-C", coreDir, "--strip-components=1")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to extract runner: %v", err)
 	}
 
-	// Hapus archive setelah ekstraksi
+	// ✅ 5. Hapus file archive setelah sukses ekstraksi
 	_ = os.Remove(tarPath)
 	log.Printf("🧹 Removed archive %s after extraction", tarPath)
-
 	log.Printf("✅ Runner binary v%s installed successfully at %s", version, coreDir)
+
 	return nil
 }
+

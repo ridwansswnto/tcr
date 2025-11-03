@@ -23,63 +23,47 @@ type Runner struct {
 func SpawnRunner(id int, cfg Config) (*Runner, error) {
 	name := fmt.Sprintf("%s-agent-%02d", cfg.InstanceName, id)
 
-	// Struktur direktori:
-	// /opt/tcr/actions-runner/
-	// ├── core/        -> berisi binary (config.sh, run.sh, dsb)
-	// └── instances/
-	//     ├── runner-01/
-	//     ├── runner-02/
-	instanceDir := filepath.Join(cfg.RunnerDir, "instances", fmt.Sprintf("runner-%02d", id))
 	coreDir := filepath.Join(cfg.RunnerDir, "core")
+	instanceDir := filepath.Join(cfg.RunnerDir, "instances", fmt.Sprintf("runner-%02d", id))
+	os.MkdirAll(instanceDir, 0755)
 
-	// Pastikan instance folder ada
-	if err := os.MkdirAll(instanceDir, 0755); err != nil {
-		return nil, fmt.Errorf("mkdir instance: %w", err)
-	}
-
-	// Ambil token dari Tower
 	token, err := FetchTokenFromTower(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("get token: %w", err)
 	}
 
-	// Jalankan config.sh dari core, tapi dengan working dir di instanceDir
-	cmd := exec.Command("/bin/bash", "-c",
-		fmt.Sprintf("cd %s && ./config.sh --unattended --url https://github.com/%s --token %s --name %s --replace",
-			coreDir,
-			cfg.RepoFullName,
-			token,
-			name,
-		),
+	// 💡 Copy hanya file core → instance, jangan seluruh folder RunnerDir
+	if err := CopyDirContents(coreDir, instanceDir); err != nil {
+		return nil, fmt.Errorf("copy core files: %w", err)
+	}
+
+	configPath := filepath.Join(instanceDir, "config.sh")
+	cmd := exec.Command(configPath,
+		"--unattended",
+		"--url", fmt.Sprintf("https://github.com/%s", cfg.RepoFullName),
+		"--token", token,
+		"--name", name,
+		"--replace",
 	)
 	cmd.Dir = instanceDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	log.Printf("⚙️  Registering runner %s ...", name)
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("config.sh failed: %w", err)
 	}
 
-	// Jalankan run.sh juga dari core (tapi workdir = instance)
-	runPath := filepath.Join(coreDir, "run.sh")
-	go func() {
-		runCmd := exec.Command(runPath)
-		runCmd.Dir = instanceDir
-		runCmd.Stdout = os.Stdout
-		runCmd.Stderr = os.Stderr
-		if err := runCmd.Run(); err != nil {
-			log.Printf("⚠️ runner-%d stopped: %v", id, err)
-		}
-	}()
+	// 🚀 Jalankan runner-nya
+	runCmd := exec.Command("./run.sh")
+	runCmd.Dir = instanceDir
+	runCmd.Stdout = os.Stdout
+	runCmd.Stderr = os.Stderr
+	if err := runCmd.Start(); err != nil {
+		return nil, fmt.Errorf("run.sh start failed: %w", err)
+	}
 
 	log.Printf("🏃 Runner %s started (dir=%s)", name, instanceDir)
-	return &Runner{
-		ID:        id,
-		Name:      name,
-		Dir:       instanceDir,
-		LastJobAt: time.Now(),
-	}, nil
+	return &Runner{ID: id, Name: name, Dir: instanceDir, LastJobAt: time.Now()}, nil
 }
 
 // FetchTokenFromTower meminta token registrasi dari Tower
