@@ -16,28 +16,39 @@ func CopyDirContents(src, dst string) error {
 			return err
 		}
 
-		// ⚙️ Skip folder "instances" hanya kalau sumbernya baseDir
+		// ⚙️ Skip folder "instances"
 		if info.IsDir() && filepath.Base(path) == "instances" {
 			return filepath.SkipDir
 		}
 
-		// Hitung path relatif
+		// Dapatkan path relatif & target
 		relPath, err := filepath.Rel(src, path)
 		if err != nil {
 			return err
 		}
 		targetPath := filepath.Join(dst, relPath)
 
+		// 📁 Kalau folder → buat folder
 		if info.IsDir() {
 			return os.MkdirAll(targetPath, info.Mode())
 		}
 
-		// Copy file
+		// 🧱 Kalau file → copy isinya
+		if !info.Mode().IsRegular() {
+			// skip special file (pipe, socket, dll)
+			return nil
+		}
+
 		srcFile, err := os.Open(path)
 		if err != nil {
 			return err
 		}
 		defer srcFile.Close()
+
+		// Pastikan folder target ada
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+			return err
+		}
 
 		dstFile, err := os.Create(targetPath)
 		if err != nil {
@@ -49,7 +60,7 @@ func CopyDirContents(src, dst string) error {
 			return err
 		}
 
-		// ✅ File .sh → jadikan executable
+		// ✅ Beri permission execute untuk file .sh
 		if filepath.Ext(targetPath) == ".sh" {
 			_ = os.Chmod(targetPath, 0755)
 		}
