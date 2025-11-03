@@ -1,13 +1,13 @@
 package agent
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ridwandwisiswanto/tcr/internal/github"
 )
 
 type Agent struct {
@@ -83,34 +83,18 @@ func (a *Agent) MonitorIdle() {
 
 // 🧹 DeregisterAll akan hapus semua runner di VM ini dari GitHub
 func (a *Agent) DeregisterAll() {
-	log.Println("🧹 Deregistering all runners (best-effort)")
-
-	coreDir := filepath.Join(a.config.RunnerDir, "core")
+	log.Println("🧹 Deregistering all runners (using GitHub API)")
 
 	for _, r := range a.runners {
-		cmd := exec.Command("/bin/bash", "-c",
-			fmt.Sprintf("cd %s && ./config.sh remove --token %s", coreDir, os.Getenv("GITHUB_TOKEN")),
-		)
-		cmd.Dir = r.Dir
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			// fallback tanpa token (remove manual mode)
-			log.Printf("⚠️ remove with token failed for %s: %v, trying without token...", r.Name, err)
-			fallback := exec.Command("/bin/bash", "-c",
-				fmt.Sprintf("cd %s && ./config.sh remove", coreDir),
-			)
-			fallback.Dir = r.Dir
-			fallback.Stdout = os.Stdout
-			fallback.Stderr = os.Stderr
-			if err2 := fallback.Run(); err2 != nil {
-				log.Printf("❌ Failed to remove runner %s: %v", r.Name, err2)
-			} else {
-				log.Printf("🗑 Runner %s removed successfully (fallback)", r.Name)
-			}
+		// ambil ID dari nama (kita bisa simpan ID di struct Runner waktu spawn)
+		if r.ID == 0 {
+			log.Printf("⚠️ Runner %s has no ID recorded, skipping API delete", r.Name)
+			continue
+		}
+		if err := github.RemoveRunnerByID(r.ID); err != nil {
+			log.Printf("❌ Failed to remove runner %s (id:%d): %v", r.Name, r.ID, err)
 		} else {
-			log.Printf("🗑 Runner %s deregistered from GitHub", r.Name)
+			log.Printf("🗑 Runner %s (id:%d) removed successfully via GitHub API", r.Name, r.ID)
 		}
 	}
 }
