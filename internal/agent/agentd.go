@@ -87,11 +87,13 @@ func (a *Agent) DeregisterAll() {
 
 	for _, r := range a.runners {
 		// ambil ID dari nama (kita bisa simpan ID di struct Runner waktu spawn)
-		if r.ID == 0 {
-			log.Printf("⚠️ Runner %s has no ID recorded, skipping API delete", r.Name)
+		runnerID, err := github.GetRunnerIDByName(r.Name)
+		if err != nil {
+			log.Printf("⚠️ Cannot find GitHub runner ID for %s: %v", r.Name, err)
 			continue
 		}
-		if err := github.RemoveRunnerByID(r.ID); err != nil {
+
+		if err := github.RemoveRunnerByID(runnerID); err != nil {
 			log.Printf("❌ Failed to remove runner %s (id:%d): %v", r.Name, r.ID, err)
 		} else {
 			log.Printf("🗑 Runner %s (id:%d) removed successfully via GitHub API", r.Name, r.ID)
