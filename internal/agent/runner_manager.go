@@ -44,13 +44,13 @@ func SpawnRunner(id int, cfg Config) (*Runner, error) {
 	}
 
 	// Jalankan config.sh dari core, tapi dengan working dir di instanceDir
-	configPath := filepath.Join(coreDir, "config.sh")
-	cmd := exec.Command(configPath,
-		"--unattended",
-		"--url", fmt.Sprintf("https://github.com/%s", cfg.RepoFullName),
-		"--token", token,
-		"--name", name,
-		"--replace",
+	cmd := exec.Command("/bin/bash", "-c",
+		fmt.Sprintf("cd %s && ./config.sh --unattended --url https://github.com/%s --token %s --name %s --replace",
+			coreDir,
+			cfg.RepoFullName,
+			token,
+			name,
+		),
 	)
 	cmd.Dir = instanceDir
 	cmd.Stdout = os.Stdout
