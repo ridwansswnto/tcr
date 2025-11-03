@@ -11,22 +11,51 @@ import (
 )
 
 func CopyDirContents(src, dst string) error {
-	os.MkdirAll(dst, 0755)
-	entries, _ := os.ReadDir(src)
-	for _, e := range entries {
-		srcPath := filepath.Join(src, e.Name())
-		dstPath := filepath.Join(dst, e.Name())
-		if e.IsDir() {
-			CopyDirContents(srcPath, dstPath)
-			continue
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
-		in, _ := os.Open(srcPath)
-		out, _ := os.Create(dstPath)
-		io.Copy(out, in)
-		in.Close()
-		out.Close()
-	}
-	return nil
+
+		// Skip folder instance lama
+		if info.IsDir() && (filepath.Base(path) == "instances" || filepath.Base(path) == "core") {
+			return filepath.SkipDir
+		}
+
+		// Hitung destinasi file/folder
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		targetPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(targetPath, info.Mode())
+		}
+
+		// Copy file
+		srcFile, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+
+		dstFile, err := os.Create(targetPath)
+		if err != nil {
+			return err
+		}
+		defer dstFile.Close()
+
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			return err
+		}
+
+		// ✅ Jika file .sh → beri permission executable
+		if filepath.Ext(targetPath) == ".sh" {
+			_ = os.Chmod(targetPath, 0755)
+		}
+
+		return nil
+	})
 }
 
 func ExtractTarGz(r io.Reader, dest string) error {
