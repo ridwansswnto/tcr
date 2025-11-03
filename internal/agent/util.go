@@ -16,12 +16,12 @@ func CopyDirContents(src, dst string) error {
 			return err
 		}
 
-		// Skip folder instance lama
-		if info.IsDir() && (filepath.Base(path) == "instances" || filepath.Base(path) == "core") {
+		// ⚙️ Skip folder "instances" hanya kalau sumbernya baseDir
+		if info.IsDir() && filepath.Base(path) == "instances" {
 			return filepath.SkipDir
 		}
 
-		// Hitung destinasi file/folder
+		// Hitung path relatif
 		relPath, err := filepath.Rel(src, path)
 		if err != nil {
 			return err
@@ -49,7 +49,7 @@ func CopyDirContents(src, dst string) error {
 			return err
 		}
 
-		// ✅ Jika file .sh → beri permission executable
+		// ✅ File .sh → jadikan executable
 		if filepath.Ext(targetPath) == ".sh" {
 			_ = os.Chmod(targetPath, 0755)
 		}
