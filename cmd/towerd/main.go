@@ -108,6 +108,7 @@ func main() {
 	controller.RegisterResultRoute()  // /job/result
 	controller.ExposeMetrics()        //metrics
 	// controller.AutoResetStuckRunners() // add this line ✅
+	http.HandleFunc("/github/token", github.TokenHandler)
 
 	// Jalankan dispatcher background
 	controller.StartDispatcher()
