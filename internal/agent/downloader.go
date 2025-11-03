@@ -8,44 +8,49 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
-// EnsureRunnerBinary memastikan binary runner tersedia di direktori yang benar.
-func EnsureRunnerBinary(dir, version string) error {
-	// Pastikan direktori runner ada
-	if dir == "" {
+// EnsureRunnerBinary memastikan binary runner tersedia & tidak recursive
+func EnsureRunnerBinary(baseDir, version string) error {
+	if baseDir == "" {
 		return fmt.Errorf("empty runner dir")
 	}
 
-	// Jika folder belum ada, buat
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		log.Printf("⚠️ Runner directory not found, creating: %s", dir)
-		if err := os.MkdirAll(dir, 0755); err != nil {
+	// Deteksi path recursive yang berbahaya
+	if strings.Contains(baseDir, "runner-") {
+		return fmt.Errorf("illegal nested runner path: %s", baseDir)
+	}
+
+	// Buat folder utama kalau belum ada
+	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
+		log.Printf("⚠️ Runner base directory not found, creating: %s", baseDir)
+		if err := os.MkdirAll(baseDir, 0755); err != nil {
 			return fmt.Errorf("cannot create runner directory: %v", err)
 		}
 	}
 
-	// Cek apakah config.sh sudah ada
-	configPath := filepath.Join(dir, "config.sh")
+	coreDir := filepath.Join(baseDir, "core")
+	configPath := filepath.Join(coreDir, "config.sh")
+	tarPath := filepath.Join(baseDir, fmt.Sprintf("runner-%s.tar.gz", version))
+
+	// Jika binary sudah ada, skip
 	if _, err := os.Stat(configPath); err == nil {
-		log.Printf("✅ Runner binary already exists at %s", dir)
+		log.Printf("✅ Runner binary already exists at %s", coreDir)
 		return nil
 	}
 
-	// Kalau belum ada, auto-download
-	log.Printf("⬇️ Runner binary not found, downloading v%s...", version)
-
+	// Unduh runner tarball
 	url := fmt.Sprintf("https://github.com/actions/runner/releases/download/v%s/actions-runner-linux-x64-%s.tar.gz", version, version)
-	tmpPath := filepath.Join(dir, fmt.Sprintf("runner-%s.tar.gz", version))
+	log.Printf("⬇️ Downloading runner binary v%s from %s", version, url)
 
-	// Download file
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to download runner binary: %v", err)
 	}
 	defer resp.Body.Close()
 
-	out, err := os.Create(tmpPath)
+	out, err := os.Create(tarPath)
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %v", err)
 	}
@@ -55,14 +60,27 @@ func EnsureRunnerBinary(dir, version string) error {
 		return fmt.Errorf("failed to save runner binary: %v", err)
 	}
 
-	// Extract file tar.gz
-	log.Printf("📦 Extracting %s ...", tmpPath)
-	cmd := exec.Command("tar", "xzf", tmpPath, "-C", dir)
+	// Ekstrak ke core/
+	log.Printf("📦 Extracting %s to %s ...", tarPath, coreDir)
+	if err := os.MkdirAll(coreDir, 0755); err != nil {
+		return fmt.Errorf("failed to create core dir: %v", err)
+	}
+
+	cmd := exec.Command("tar", "xzf", tarPath, "-C", coreDir, "--strip-components=1")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to extract runner: %v", err)
 	}
 
-	os.Remove(tmpPath)
-	log.Printf("✅ Runner binary downloaded & extracted successfully to %s", dir)
+	// Hapus tarball
+	if err := os.Remove(tarPath); err == nil {
+		log.Printf("🧹 Removed archive %s after extraction", tarPath)
+	}
+
+	// Pastikan config.sh bisa dieksekusi
+	if err := os.Chmod(filepath.Join(coreDir, "config.sh"), 0755); err != nil {
+		log.Printf("⚠️ Failed to chmod config.sh: %v", err)
+	}
+
+	log.Printf("✅ Runner binary v%s ready at %s", version, coreDir)
 	return nil
 }
