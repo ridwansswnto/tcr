@@ -10,19 +10,6 @@ import (
 	"path/filepath"
 )
 
-// EnsureRunnerBinary memastikan binary GitHub Actions runner tersedia di /core, bukan di setiap runner instance.
-package agent
-
-import (
-	"fmt"
-	"io"
-	"log"
-	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
-)
-
 // EnsureRunnerBinary memastikan binary core runner tersedia di <baseDir>/core.
 func EnsureRunnerBinary(baseDir, version string) error {
 	if baseDir == "" {
@@ -82,4 +69,3 @@ func EnsureRunnerBinary(baseDir, version string) error {
 
 	return nil
 }
-
