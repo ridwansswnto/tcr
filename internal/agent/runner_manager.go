@@ -19,24 +19,29 @@ type Runner struct {
 	LastJobAt time.Time
 }
 
-// SpawnRunner membuat 1 instance runner baru berdasarkan binary di core/
+// SpawnRunner membuat 1 instance runner baru berdasarkan shared core/
 func SpawnRunner(id int, cfg Config) (*Runner, error) {
 	name := fmt.Sprintf("%s-agent-%02d", cfg.InstanceName, id)
-
 	coreDir := filepath.Join(cfg.RunnerDir, "core")
 	instanceDir := filepath.Join(cfg.RunnerDir, "instances", fmt.Sprintf("runner-%02d", id))
-	os.MkdirAll(instanceDir, 0755)
 
+	// pastikan folder instance ada
+	if err := os.MkdirAll(instanceDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create instance dir: %w", err)
+	}
+
+	// ambil token dari tower
 	token, err := FetchTokenFromTower(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("get token: %w", err)
 	}
 
-	// 💡 Copy hanya file core → instance, jangan seluruh folder RunnerDir
-	if err := CopyDirContents(coreDir, instanceDir); err != nil {
+	// 🔗 gunakan coreDir sebagai template instance baru
+	if err := CreateInstanceFromCore(coreDir, instanceDir); err != nil {
 		return nil, fmt.Errorf("copy core files: %w", err)
 	}
 
+	// jalankan konfigurasi runner
 	configPath := filepath.Join(instanceDir, "config.sh")
 	cmd := exec.Command(configPath,
 		"--unattended",
@@ -63,7 +68,12 @@ func SpawnRunner(id int, cfg Config) (*Runner, error) {
 	}
 
 	log.Printf("🏃 Runner %s started (dir=%s)", name, instanceDir)
-	return &Runner{ID: id, Name: name, Dir: instanceDir, LastJobAt: time.Now()}, nil
+	return &Runner{
+		ID:        id,
+		Name:      name,
+		Dir:       instanceDir,
+		LastJobAt: time.Now(),
+	}, nil
 }
 
 // FetchTokenFromTower meminta token registrasi dari Tower
