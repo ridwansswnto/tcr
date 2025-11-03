@@ -29,6 +29,8 @@ func AddJob(j Job) {
 	defer jobQueueMu.Unlock()
 
 	jobQueue = append(jobQueue, j)
+	// jobQueueGauge.Set(float64(len(jobQueue))) // 🟢 metrics update
+
 	log.Printf("🧩 Job added to queue: %s (%s/%s)", j.JobName, j.RepoOwner, j.RepoName)
 }
 

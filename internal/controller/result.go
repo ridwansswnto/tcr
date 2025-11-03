@@ -14,23 +14,6 @@ type JobResult struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// // UpdateJobStatus mengubah status job di queue
-// func UpdateJobStatus(id string, status string) {
-// 	jobQueueMu.Lock()
-// 	defer jobQueueMu.Unlock()
-
-// 	for i, job := range jobQueue {
-// 		if job.ID == id {
-// 			job.Status = status
-// 			jobQueue[i] = job
-// 			log.Printf("🟡 Job %s status updated to %s", id, status)
-// 			return
-// 		}
-// 	}
-// 	log.Printf("⚠️ Job %s not found for status update", id)
-// }
-
-// ResultHandler menerima callback dari runner
 // ResultHandler menerima callback dari runner
 func ResultHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -46,14 +29,12 @@ func ResultHandler(w http.ResponseWriter, r *http.Request) {
 
 	UpdateJobStatus(res.ID, res.Status)
 
-	// 🔹 Jika job selesai, tandai runner idle dan ubah job jadi "done"
 	if res.Status == "success" || res.Status == "failed" {
 		MarkRunnerBusy(res.RunnerID, false)
 		UpdateJobStatus(res.ID, "done")
 		log.Printf("✅ Job %s fully completed and marked done", res.ID)
 
-		// 🔹 Jalankan job berikutnya segera
-		go TriggerNextJob()
+		go TriggerNextJob() // langsung trigger job berikutnya
 	}
 
 	w.WriteHeader(http.StatusOK)

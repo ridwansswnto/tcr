@@ -8,7 +8,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"os/signal"
+	"syscall"
 	"time"
+
+	"github.com/ridwandwisiswanto/tcr/internal/github"
 )
 
 var (
@@ -17,17 +22,69 @@ var (
 	isBusy        = false
 )
 
-func main() {
-	if env := os.Getenv("RUNNER_ID"); env != "" {
-		runnerID = env
-	}
+// Struct untuk menerima token dari Tower
+type RegistrationPayload struct {
+	Token string `json:"token"`
+	URL   string `json:"url"`
+}
 
-	go heartbeatLoop()
-	http.HandleFunc("/job", handleJob)
+func main() {
+	http.HandleFunc("/register-hybrid", func(w http.ResponseWriter, r *http.Request) {
+		var payload github.RegistrationPayload
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &payload)
+
+		if payload.Token == "" {
+			http.Error(w, "missing token", http.StatusBadRequest)
+			return
+		}
+
+		runnerName := os.Getenv("RUNNER_NAME")
+		if runnerName == "" {
+			runnerName = "runner-001"
+		}
+
+		url := payload.URL
+		log.Printf("🧩 Registering runner %s (Hybrid Mode)...", runnerName)
+
+		if err := github.HybridRegister(payload.Token, url, runnerName); err != nil {
+			log.Printf("❌ Registration failed: %v", err)
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		os.Setenv("LAST_RUNNER_TOKEN", payload.Token)
+		go github.HybridRun()
+
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Handle graceful shutdown (auto unregister)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sig
+		github.HybridUnregister()
+		os.Exit(0)
+	}()
 
 	port := ":8081"
-	log.Printf("🏃 Runner '%s' listening on %s", runnerID, port)
+	log.Printf("🏃 Runner '%s' listening on %s", os.Getenv("RUNNER_NAME"), port)
 	log.Fatal(http.ListenAndServe(port, nil))
+
+	//if env := os.Getenv("RUNNER_ID"); env != "" {
+	//	runnerID = env
+	// }
+
+	// go heartbeatLoop()
+	// http.HandleFunc("/job", handleJob)
+	// http.HandleFunc("/register", RegisterHandler)
+	// http.HandleFunc("/register-api", RegisterAPIModeHandler)
+
+	// port := ":8081"
+	// log.Printf("🏃 Runner '%s' listening on %s", runnerID, port)
+	// log.Fatal(http.ListenAndServe(port, nil))
+
 }
 
 func heartbeatLoop() {
@@ -80,4 +137,66 @@ func reportResult(jobID, status string) {
 	}
 	defer resp.Body.Close()
 	log.Printf("📨 Reported job %s as %s", jobID, status)
+}
+
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	var payload RegistrationPayload
+	body, _ := io.ReadAll(r.Body)
+	json.Unmarshal(body, &payload)
+
+	if payload.Token == "" {
+		http.Error(w, "missing token", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("🪪 Received registration token, registering to GitHub Actions...")
+
+	cmd := exec.Command(
+		"./config.sh",
+		"--url", payload.URL,
+		"--token", payload.Token,
+		"--name", os.Getenv("RUNNER_NAME"),
+		"--unattended",
+		"--replace",
+	)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("❌ Failed to register runner: %v", err)
+		http.Error(w, "runner registration failed", 500)
+		return
+	}
+
+	log.Printf("✅ Runner successfully registered to GitHub Actions.")
+	w.WriteHeader(http.StatusOK)
+}
+
+func RegisterAPIModeHandler(w http.ResponseWriter, r *http.Request) {
+	var payload RegistrationPayload
+	body, _ := io.ReadAll(r.Body)
+	json.Unmarshal(body, &payload)
+
+	if payload.Token == "" {
+		http.Error(w, "missing token", http.StatusBadRequest)
+		return
+	}
+
+	owner := os.Getenv("GITHUB_OWNER")
+	repo := os.Getenv("GITHUB_REPO")
+	runnerName := os.Getenv("RUNNER_NAME")
+	if runnerName == "" {
+		runnerName = "runner-001"
+	}
+
+	log.Printf("🧩 Registering runner %s directly via GitHub API...", runnerName)
+	if err := github.RegisterRunnerDirect(owner, repo, payload.Token, runnerName); err != nil {
+		log.Printf("❌ Runner registration failed: %v", err)
+		http.Error(w, fmt.Sprintf("failed: %v", err), 500)
+		return
+	}
+
+	log.Printf("✅ Runner %s registered successfully via API!", runnerName)
+	w.WriteHeader(http.StatusOK)
 }
