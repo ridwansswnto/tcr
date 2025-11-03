@@ -89,14 +89,26 @@ func (a *Agent) DeregisterAll() {
 
 	for _, r := range a.runners {
 		cmd := exec.Command("/bin/bash", "-c",
-			fmt.Sprintf("cd %s && ./config.sh remove --unattended", coreDir),
+			fmt.Sprintf("cd %s && ./config.sh remove --token %s", coreDir, os.Getenv("GITHUB_TOKEN")),
 		)
 		cmd.Dir = r.Dir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
 		if err := cmd.Run(); err != nil {
-			log.Printf("⚠️ Failed to remove runner %s: %v", r.Name, err)
+			// fallback tanpa token (remove manual mode)
+			log.Printf("⚠️ remove with token failed for %s: %v, trying without token...", r.Name, err)
+			fallback := exec.Command("/bin/bash", "-c",
+				fmt.Sprintf("cd %s && ./config.sh remove", coreDir),
+			)
+			fallback.Dir = r.Dir
+			fallback.Stdout = os.Stdout
+			fallback.Stderr = os.Stderr
+			if err2 := fallback.Run(); err2 != nil {
+				log.Printf("❌ Failed to remove runner %s: %v", r.Name, err2)
+			} else {
+				log.Printf("🗑 Runner %s removed successfully (fallback)", r.Name)
+			}
 		} else {
 			log.Printf("🗑 Runner %s deregistered from GitHub", r.Name)
 		}
