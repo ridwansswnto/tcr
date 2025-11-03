@@ -14,10 +14,6 @@ type Agent struct {
 	config  Config
 }
 
-func (a *Agent) Config() Config {
-	return a.config
-}
-
 func NewAgent() *Agent {
 	cfg := LoadConfig()
 
@@ -98,4 +94,9 @@ func (a *Agent) DeregisterAll() {
 			log.Printf("🗑 Runner %s deregistered from GitHub", r.Name)
 		}
 	}
+}
+
+// ✅ Getter Config() untuk akses config dari luar package
+func (a *Agent) Config() Config {
+	return a.config
 }
