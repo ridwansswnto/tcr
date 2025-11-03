@@ -42,6 +42,7 @@ func SpawnRunner(id int, cfg Config) (*Runner, error) {
 	}
 
 	// jalankan konfigurasi runner
+	os.Remove(filepath.Join(instanceDir, ".runner"))
 	configPath := filepath.Join(instanceDir, "config.sh")
 	cmd := exec.Command(configPath,
 		"--unattended",
