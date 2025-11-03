@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -83,12 +84,18 @@ func (a *Agent) MonitorIdle() {
 // 🧹 DeregisterAll akan hapus semua runner di VM ini dari GitHub
 func (a *Agent) DeregisterAll() {
 	log.Println("🧹 Deregistering all runners (best-effort)")
+
+	coreDir := filepath.Join(a.config.RunnerDir, "core")
+
 	for _, r := range a.runners {
-		removeCmd := exec.Command("./config.sh", "remove", "--unattended")
-		removeCmd.Dir = r.Dir
-		removeCmd.Stdout = os.Stdout
-		removeCmd.Stderr = os.Stderr
-		if err := removeCmd.Run(); err != nil {
+		cmd := exec.Command("/bin/bash", "-c",
+			fmt.Sprintf("cd %s && ./config.sh remove --unattended", coreDir),
+		)
+		cmd.Dir = r.Dir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
 			log.Printf("⚠️ Failed to remove runner %s: %v", r.Name, err)
 		} else {
 			log.Printf("🗑 Runner %s deregistered from GitHub", r.Name)
