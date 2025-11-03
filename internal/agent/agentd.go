@@ -4,6 +4,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -14,6 +16,22 @@ type Agent struct {
 
 func NewAgent() *Agent {
 	cfg := LoadConfig()
+
+	// ✅ Auto-fix runner path (absolute)
+	if !strings.HasPrefix(cfg.RunnerDir, "/") {
+		cwd, _ := os.Getwd()
+		cfg.RunnerDir = filepath.Join(cwd, cfg.RunnerDir)
+		log.Printf("📂 Fixed relative runner path → %s", cfg.RunnerDir)
+	}
+
+	// ✅ Pastikan folder ada (create jika belum)
+	if _, err := os.Stat(cfg.RunnerDir); os.IsNotExist(err) {
+		log.Printf("⚠️ Runner dir not found, creating at %s", cfg.RunnerDir)
+		if err := os.MkdirAll(cfg.RunnerDir, 0755); err != nil {
+			log.Fatalf("❌ Cannot create runner dir: %v", err)
+		}
+	}
+
 	return &Agent{
 		config:  cfg,
 		runners: make([]*Runner, 0),
@@ -21,14 +39,16 @@ func NewAgent() *Agent {
 }
 
 func (a *Agent) Run() error {
+	log.Printf("🚀 Starting tower-agentd...")
 	log.Printf("🧩 agentd started (max runners: %d)", a.config.MaxRunners)
 
-	// 1. pastikan binary runner tersedia
+	// 1️⃣ Pastikan binary runner tersedia
 	if err := EnsureRunnerBinary(a.config.RunnerDir, a.config.RunnerVersion); err != nil {
+		log.Printf("⚠️ EnsureRunnerBinary failed: %v", err)
 		return err
 	}
 
-	// 2. spawn runners
+	// 2️⃣ Spawn runners
 	for i := 1; i <= a.config.MaxRunners; i++ {
 		r, err := SpawnRunner(i, a.config)
 		if err != nil {
@@ -38,10 +58,10 @@ func (a *Agent) Run() error {
 		a.runners = append(a.runners, r)
 	}
 
-	// 3. loop heartbeat
+	// 3️⃣ Kirim heartbeat loop
 	go a.HeartbeatLoop()
 
-	// 4. monitor idle
+	// 4️⃣ Monitor idle
 	a.MonitorIdle()
 
 	return nil
@@ -60,7 +80,7 @@ func (a *Agent) MonitorIdle() {
 	}
 }
 
-// DeregisterAll akan menghapus semua runner di VM ini dari GitHub
+// 🧹 DeregisterAll akan hapus semua runner di VM ini dari GitHub
 func (a *Agent) DeregisterAll() {
 	log.Println("🧹 Deregistering all runners (best-effort)")
 	for _, r := range a.runners {
