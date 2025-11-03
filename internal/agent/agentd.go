@@ -14,6 +14,10 @@ type Agent struct {
 	config  Config
 }
 
+func (a *Agent) Config() Config {
+	return a.config
+}
+
 func NewAgent() *Agent {
 	cfg := LoadConfig()
 
