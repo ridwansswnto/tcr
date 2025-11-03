@@ -71,12 +71,24 @@ func (a *Agent) Run() error {
 func (a *Agent) MonitorIdle() {
 	for {
 		time.Sleep(15 * time.Second)
+
+		// Jika semua runner idle
 		if AllRunnersIdle(a.runners, a.config.IdleTimeout) {
 			log.Println("🧹 All runners idle — shutting down soon")
 			a.DeregisterAll()
+
+			// 🔒 Kosongkan daftar runner agar tidak loop terus
+			a.runners = nil
+
+			// 🚀 Kalau auto-shutdown aktif, hentikan VM
 			if a.config.AutoShutdown {
+				log.Println("💤 Auto-shutdown enabled, exiting agentd...")
 				os.Exit(0)
 			}
+
+			// 🧘 Stop loop supaya gak spam deregister terus
+			log.Println("🧘 All runners removed, stopping idle monitor loop.")
+			break
 		}
 	}
 }
