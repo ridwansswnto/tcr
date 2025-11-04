@@ -109,6 +109,8 @@ func main() {
 	controller.ExposeMetrics()        //metrics
 	// controller.AutoResetStuckRunners() // add this line ✅
 	http.HandleFunc("/github/token", github.TokenHandler)
+	controller.StartJobQueueListener()
+	controller.StartPoller()
 
 	// Jalankan dispatcher background
 	controller.StartDispatcher()

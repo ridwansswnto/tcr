@@ -5,26 +5,27 @@ import (
 	"log"
 	"net/http"
 	"sync"
-	"time"
+
+	"github.com/ridwandwisiswanto/tcr/internal/core"
 )
 
-type Job struct {
-	ID        string    `json:"id"`
-	Action    string    `json:"action"`
-	RepoOwner string    `json:"repo_owner"`
-	RepoName  string    `json:"repo_name"`
-	JobName   string    `json:"job_name"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-}
+// type Job struct {
+// 	ID        string    `json:"id"`
+// 	Action    string    `json:"action"`
+// 	RepoOwner string    `json:"repo_owner"`
+// 	RepoName  string    `json:"repo_name"`
+// 	JobName   string    `json:"job_name"`
+// 	Status    string    `json:"status"`
+// 	CreatedAt time.Time `json:"created_at"`
+// }
 
 var (
-	jobQueue   = []Job{}
+	jobQueue   = []core.Job{}
 	jobQueueMu sync.Mutex
 )
 
 // AddJob menambahkan job baru ke queue
-func AddJob(j Job) {
+func AddJob(j core.Job) {
 	jobQueueMu.Lock()
 	defer jobQueueMu.Unlock()
 
@@ -35,12 +36,12 @@ func AddJob(j Job) {
 }
 
 // GetJobs mengembalikan semua job yang ada di queue
-func GetJobs() []Job {
+func GetJobs() []core.Job {
 	jobQueueMu.Lock()
 	defer jobQueueMu.Unlock()
 
 	// copy agar thread-safe
-	jobs := make([]Job, len(jobQueue))
+	jobs := make([]core.Job, len(jobQueue))
 	copy(jobs, jobQueue)
 	return jobs
 }
@@ -72,4 +73,14 @@ func RegisterHTTPRoutes() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(jobs)
 	})
+}
+
+// StartJobQueueListener — listener background untuk job masuk dari webhook
+func StartJobQueueListener() {
+	go func() {
+		for job := range core.JobQueue {
+			log.Printf("📦 Received new job: %s from repo %s/%s", job.JobName, job.RepoOwner, job.RepoName)
+			AddJob(job)
+		}
+	}()
 }

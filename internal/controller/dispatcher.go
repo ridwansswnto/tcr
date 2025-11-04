@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/ridwandwisiswanto/tcr/internal/core"
 )
 
 var lastDispatchedID string
@@ -19,7 +21,7 @@ func StartDispatcher() {
 			time.Sleep(3 * time.Second)
 
 			jobQueueMu.Lock()
-			jobsSnapshot := make([]*Job, 0, len(jobQueue))
+			jobsSnapshot := make([]*core.Job, 0, len(jobQueue))
 			for i := range jobQueue {
 				jobsSnapshot = append(jobsSnapshot, &jobQueue[i])
 			}
@@ -69,7 +71,7 @@ func StartDispatcher() {
 func TriggerNextJob() {
 	go func() {
 		jobQueueMu.Lock()
-		var nextJob *Job
+		var nextJob *core.Job
 		for i := range jobQueue {
 			if jobQueue[i].Status == "queued" {
 				nextJob = &jobQueue[i]

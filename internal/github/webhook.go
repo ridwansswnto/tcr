@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ridwandwisiswanto/tcr/internal/controller"
+	"github.com/ridwandwisiswanto/tcr/internal/core"
 )
 
 func WebhookHandler(w http.ResponseWriter, r *http.Request) {
@@ -36,8 +36,8 @@ func WebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	controller.AddJob(controller.Job{
-		ID:        time.Now().Format("20060102150405"), // simple ID
+	core.AddJob(core.Job{
+		ID:        time.Now().Format("20060102150405"),
 		Action:    payload.Action,
 		RepoOwner: payload.Repository.Owner.Login,
 		RepoName:  payload.Repository.Name,
