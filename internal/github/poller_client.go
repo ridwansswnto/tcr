@@ -32,7 +32,7 @@ func CountQueuedRuns() (int, error) {
 	// per_page small to reduce payload; GitHub paginates — we'll only read first page count
 	q.Set("per_page", "100")
 
-	req, _ := http.NewRequest("GET", apiURL("/actions/runs", q), nil)
+	req, _ := http.NewRequest("GET", apiURL("/actions/workflow-runs", q), nil)
 	req.Header.Set("Authorization", "Bearer "+githubToken)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
