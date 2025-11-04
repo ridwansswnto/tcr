@@ -10,13 +10,21 @@ import (
 )
 
 var (
-	githubToken = os.Getenv("GITHUB_TOKEN")
-	githubOwner = os.Getenv("GITHUB_OWNER")
-	githubRepo  = os.Getenv("GITHUB_REPO")
+	githubToken string
+	githubOwner string
+	githubRepo  string
 	client      = &http.Client{Timeout: 10 * time.Second}
 )
 
+func init() {
+	fmt.Println("🔍 ENV CHECK:", os.Getenv("GITHUB_OWNER"), os.Getenv("GITHUB_REPO"), os.Getenv("GITHUB_TOKEN"))
+}
+
 func apiURL(path string, q url.Values) string {
+	githubToken = os.Getenv("GITHUB_TOKEN")
+	githubOwner = os.Getenv("GITHUB_OWNER")
+	githubRepo = os.Getenv("GITHUB_REPO")
+	client = &http.Client{Timeout: 10 * time.Second}
 	base := fmt.Sprintf("https://api.github.com/repos/%s/%s", githubOwner, githubRepo)
 	u := base + path
 	if q != nil {
@@ -27,6 +35,8 @@ func apiURL(path string, q url.Values) string {
 
 // CountQueuedRuns returns number of workflow runs with status=queued
 func CountQueuedRuns() (int, error) {
+	// fmt.Printf("DEBUG GITHUB_OWNER=%s GITHUB_REPO=%s GITHUB_TOKEN_PREFIX=%s...\n",
+	// 	githubOwner, githubRepo, githubToken[:6])
 	q := url.Values{}
 	q.Set("status", "queued")
 	// per_page small to reduce payload; GitHub paginates — we'll only read first page count
