@@ -1,0 +1,8 @@
+# .github/workflows/ping.yml
+name: Ping
+on: [push]
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Hello from TCR polling test"
