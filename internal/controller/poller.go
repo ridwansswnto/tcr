@@ -15,15 +15,14 @@ import (
 )
 
 var (
-	pollIntervalSec = atoiEnv("POLL_INTERVAL_SECONDS", 30)
-	mode            = os.Getenv("MODE") // "polling" or "webhook"
-	// safety caps
-	maxScaleStep     = atoiEnv("SCALE_STEP_MAX", 3) // spawn at most 3 runners per tick
-	globalMaxRunners = atoiEnv("MAX_Runners_TOTAL", 20)
-	spawnMethod      = os.Getenv("SPAWN_METHOD") // "local" or "gcp_mig"
-	agentRegisterURL = getEnv("AGENT_REGISTRATION_ENDPOINT", "http://localhost:8081/register-hybrid")
-	gcloudProject    = os.Getenv("GCP_PROJECT")
-	gcpMigName       = os.Getenv("GCP_MIG_NAME")
+	pollIntervalSec  int
+	maxScaleStep     int
+	globalMaxRunners int
+	spawnMethod      string
+	agentRegisterURL string
+	gcloudProject    string
+	gcpMigName       string
+	mode             string
 )
 
 func atoiEnv(k string, def int) int {
@@ -43,6 +42,16 @@ func getEnv(k, def string) string {
 }
 
 func StartPoller() {
+	mode = os.Getenv("MODE")
+	pollIntervalSec = atoiEnv("POLL_INTERVAL_SECONDS", 30)
+	maxScaleStep = atoiEnv("SCALE_STEP_MAX", 3)
+	globalMaxRunners = atoiEnv("MAX_RUNNERS_TOTAL", 20)
+	spawnMethod = os.Getenv("SPAWN_METHOD")
+	agentRegisterURL = getEnv("AGENT_REGISTRATION_ENDPOINT", "http://localhost:8081/register-hybrid")
+	gcloudProject = os.Getenv("GCP_PROJECT")
+	gcpMigName = os.Getenv("GCP_MIG_NAME")
+	log.Printf("🧩 MODE env detected = '%s'", mode)
+
 	if mode != "polling" {
 		log.Printf("🔕 Poller disabled (MODE=%s)", mode)
 		return

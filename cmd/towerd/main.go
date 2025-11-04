@@ -14,11 +14,21 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load()
+	// _ = godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		log.Printf("⚠️  .env not found or failed to load: %v", err)
+	}
 
 	secret := os.Getenv("GITHUB_WEBHOOK_SECRET")
 	if secret == "" {
 		log.Fatal("❌ GITHUB_WEBHOOK_SECRET is not set.")
+	}
+
+	mode := os.Getenv("MODE")
+	log.Printf("🧩 MODE env detected = '%s'", mode)
+
+	if mode == "" {
+		log.Fatal("❌ MODE is not set.")
 	}
 
 	http.HandleFunc("/register-runner", func(w http.ResponseWriter, r *http.Request) {
