@@ -174,8 +174,13 @@ func scaleUpViaGCP(n int) error {
 	}
 	// Example: gcloud compute instance-groups managed resize NAME --size=NEW_SIZE --project=PROJECT
 	// This is a placeholder: you must compute new size (current+ n) and call CLI
-	cmd := exec.Command("gcloud", "compute", "instance-groups", "managed", "resize",
-		gcpMigName, "--project", gcloudProject, "--size", fmt.Sprintf("%d", n))
+	cmd := exec.Command("gcloud",
+		"compute", "instance-groups", "managed", "resize",
+		gcpMigName,
+		"--project", gcloudProject,
+		"--zone", "asia-southeast1-a",
+		"--size", fmt.Sprintf("%d", n),
+	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("gcloud resize failed: %v %s", err, string(out))
